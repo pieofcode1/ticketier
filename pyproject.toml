@@ -1,0 +1,15 @@
+[project]
+name = "ticketier"
+version = "0.1.0"
+description = "Agentic App leveraging Azure AI Foundry"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "agentic-framework>=0.3.11",
+    "azure-identity>=1.25.1",
+    "azure-search-documents>=11.6.0",
+    "openai>=1.0.0",
+    "psycopg2-binary>=2.9.11",
+    "streamlit>=1.51.0",
+    "PyPDF2>=3.0.0",
+]
