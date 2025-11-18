@@ -151,7 +151,7 @@ class AzureSearchHelper:
         index_names = self.index_client.list_index_names()
         return list(index_names)
 
-    def extract_text_from_pdf(self, pdf_path: str) -> List[Dict[str, Any]]:
+    def extract_text_from_pdf(self, pdf_path) -> List[Dict[str, Any]]:
         """
         Extract text from a PDF file, organizing by pages.
 
@@ -163,17 +163,21 @@ class AzureSearchHelper:
         """
         pages = []
         
-        with open(pdf_path, 'rb') as file:
-            pdf_reader = PyPDF2.PdfReader(file)
+        if not isinstance(pdf_path, str):
+            print("pdf_path is not a string, assuming file-like object")
+            pdf_reader = PyPDF2.PdfReader(pdf_path)
+        else:
+            with open(pdf_path, 'rb') as file:
+                pdf_reader = PyPDF2.PdfReader(file)
             
-            for page_num, page in enumerate(pdf_reader.pages, start=1):
-                text = page.extract_text()
-                if text.strip():  # Only include pages with content
-                    pages.append({
-                        'page_number': page_num,
-                        'text': text,
-                        'char_count': len(text)
-                    })
+        for page_num, page in enumerate(pdf_reader.pages, start=1):
+            text = page.extract_text()
+            if text.strip():  # Only include pages with content
+                pages.append({
+                    'page_number': page_num,
+                    'text': text,
+                    'char_count': len(text)
+                })
         
         return pages
 
@@ -199,7 +203,7 @@ class AzureSearchHelper:
         
         base_metadata = metadata or {}
         base_metadata.update({
-            'source_file': os.path.basename(pdf_path),
+            'source_file': os.path.basename(pdf_path) if isinstance(pdf_path, str) else pdf_path.name,
             'chunking_strategy': 'by_page'
         })
         

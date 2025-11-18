@@ -35,18 +35,23 @@ def create_cogsearch_index(index_name: str, pdf_files: list):
     # Create index once
     st.session_state.search_helper.create_index(index_name, embedding_dimensions=1536)
 
+    print (pdf_files)
+    if not isinstance(pdf_files, list):
+        pdf_files = [pdf_files]
+
     # Process multiple PDFs
-    for pdf_path, title in pdf_files:
-        print(f"\nProcessing: {title}")
+    for file_content in pdf_files:
+        print(f"\nProcessing: {file_content.name}")
         result = st.session_state.search_helper.process_and_index_pdf(
-            pdf_path=pdf_path,
+            pdf_path=file_content,
             index_name=index_name,
-            title=title,
+            create_index=st.session_state.create_new_index,
+            title=file_content.name,
             chunking_strategy='page',
             metadata={
-            'category': 'product_release_notes',
-            'timestamp': datetime.now().isoformat()
-        }
+                'category': 'product_release_notes',
+                'timestamp': datetime.now().isoformat()
+            }
         )
         print(f"Completed: {result['uploaded']} documents uploaded")
 
@@ -60,6 +65,8 @@ def main():
         st.session_state.index_name = None
     if "user_question" not in st.session_state:
         st.session_state.user_question = None
+    if "create_new_index" not in st.session_state:
+        st.session_state.create_new_index = True
     if "has_vectorized_data" not in st.session_state:
         st.session_state.has_vectorized_data = None
     if "search_helper" not in st.session_state:
@@ -71,6 +78,8 @@ def main():
         'Cognitive Search Index name', placeholder='Name of the index')
     if index_name:
         st.session_state.index_name = index_name
+
+    st.session_state.create_new_index = st.toggle("Create New Index?", value=True, key="create_new_index_toggle")
 
     pdf_docs = st.file_uploader(
         "Upload your PDFs here and click on 'Process' ", accept_multiple_files=True)
