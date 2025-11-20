@@ -76,13 +76,17 @@ def search_similar_issues(
             SELECT 
                 ticket_id,
                 CAST(created as TEXT),
-                top_contact_reason,
-                customer_description,
-                1 - (customer_description_vector <=> %s::vector) AS similarity_score
-            FROM support_tickets
-            WHERE customer_description_vector IS NOT NULL
-                AND 1 - (customer_description_vector <=> %s::vector) >= %s
-            ORDER BY customer_description_vector <=> %s::vector
+                status,
+                issue_summary,
+                priority,
+                affected_service,
+                customer_impact,
+                assigned_team,
+                1 - (issue_summary_vector <=> %s::vector) AS similarity_score
+            FROM servicenow_tickets_with_category
+            WHERE issue_summary_vector IS NOT NULL
+                AND 1 - (issue_summary_vector <=> %s::vector) >= %s
+            ORDER BY issue_summary_vector <=> %s::vector
             LIMIT %s;
         """
         
