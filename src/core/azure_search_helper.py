@@ -702,8 +702,8 @@ class AzureSearchHelper:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                temperature=temperature,
-                max_tokens=max_tokens
+                # temperature=temperature,
+                # max_tokens=max_tokens
             )
             
             answer = response.choices[0].message.content

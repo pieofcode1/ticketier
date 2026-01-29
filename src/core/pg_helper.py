@@ -5,6 +5,8 @@ from psycopg2.extras import RealDictCursor
 from typing import List, Dict, Any, Optional, Set, Callable
 from dotenv import load_dotenv
 import numpy as np
+from typing import Annotated
+from pydantic import Field
 import json
 
 
@@ -45,7 +47,7 @@ def get_query_embedding(conn, text: str) -> List[float]:
         cursor.close()
 
 def search_similar_issues(
-    query: str,
+    query: Annotated[str, Field(description="Search query text.")],
     top_k: int = 5,
     similarity_threshold: float = 0.7
 ) -> List[Dict[str, Any]]:

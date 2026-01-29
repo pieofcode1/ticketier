@@ -13,4 +13,6 @@ dependencies = [
     "PyPDF2>=3.0.0",
     "azure-ai-projects>=2.0.0b2",
     "python-dotenv>=1.2.1",
+    "agent-framework==1.0.0b251211",
+    "agent-framework-devui>=1.0.0b251211",
 ]
