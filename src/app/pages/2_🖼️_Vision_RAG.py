@@ -56,26 +56,41 @@ def get_image_media_type(file_name: str) -> str:
 
 
 def handle_user_input(question: str):
-    """Process user question about the uploaded image."""
-    if not st.session_state.image_data:
-        st.warning("Please upload an image first.")
+    """Process user question about the uploaded images."""
+    if not st.session_state.image_data_list:
+        st.warning("Please upload at least one image first.")
         return
 
     try:
         manager = get_openai_manager()
         
-        # Get media type from uploaded file
-        media_type = st.session_state.get("image_media_type", "image/png")
-        
-        # Analyze image using the OpenAI Manager
-        result = manager.analyze_image(
-            image=st.session_state.image_data,
-            prompt=question,
-            instructions="You are a helpful assistant that analyzes images and answers questions about them. "
-                        "Provide detailed, accurate descriptions and insights based on the image content.",
-            media_type=media_type,
-            detail="high"
-        )
+        images = st.session_state.image_data_list
+        media_types = st.session_state.image_media_types
+
+        if len(images) == 1:
+            # Single image — use analyze_image
+            result = manager.analyze_image(
+                image=images[0],
+                prompt=question,
+                instructions="You are a helpful assistant that analyzes images and answers questions about them. "
+                            "Provide detailed, accurate descriptions and insights based on the image content.",
+                media_type=media_types[0],
+                detail="high"
+            )
+        else:
+            # Multiple images — use analyze_multiple_images
+            from src.core.openai_manager import ImageContent
+            image_contents = [
+                ImageContent(data=img, media_type=mt, detail="high")
+                for img, mt in zip(images, media_types)
+            ]
+            result = manager.analyze_multiple_images(
+                images=image_contents,
+                prompt=question,
+                instructions="You are a helpful assistant that analyzes images and answers questions about them. "
+                            "Provide detailed, accurate descriptions and insights based on the image content.",
+                detail="high"
+            )
 
         # Store the Q&A in chat history
         st.session_state.vision_chat_history.append({
@@ -122,18 +137,20 @@ def main():
     st.write(CUSTOM_CSS, unsafe_allow_html=True)
 
     # Initialize session state
-    if "image_data" not in st.session_state:
-        st.session_state.image_data = None
-    if "image_media_type" not in st.session_state:
-        st.session_state.image_media_type = "image/png"
+    if "image_data_list" not in st.session_state:
+        st.session_state.image_data_list = []
+    if "image_media_types" not in st.session_state:
+        st.session_state.image_media_types = []
+    if "image_names" not in st.session_state:
+        st.session_state.image_names = []
     if "vision_chat_history" not in st.session_state:
         st.session_state.vision_chat_history = []
 
     st.header("Chat with your Images 🖼️", divider="red")
     
     # Display info if no image uploaded
-    if not st.session_state.image_data:
-        st.info("👈 Upload an image in the sidebar to get started!")
+    if not st.session_state.image_data_list:
+        st.info("👈 Upload one or more images in the sidebar to get started!")
 
     # Chat input
     user_question = st.chat_input("Ask a question about the image")
@@ -146,34 +163,37 @@ def main():
 
     # Sidebar for image upload
     with st.sidebar:
-        st.subheader("📤 Upload Image")
+        st.subheader("📤 Upload Images")
         
-        image_file = st.file_uploader(
-            "Choose an image to analyze",
+        image_files = st.file_uploader(
+            "Choose images to analyze",
             type=["png", "jpg", "jpeg", "gif", "webp", "bmp"],
-            accept_multiple_files=False,
+            accept_multiple_files=True,
             help="Supported formats: PNG, JPG, JPEG, GIF, WEBP, BMP"
         )
 
-        if image_file is not None:
-            # Get image data
-            image_data = image_file.getvalue()
+        if image_files:
+            # Get all image data
+            new_data = [f.getvalue() for f in image_files]
             
-            # Check if it's a new image
-            if image_data != st.session_state.image_data:
+            # Check if images changed
+            if new_data != st.session_state.image_data_list:
                 st.session_state.vision_chat_history = []
-                st.session_state.image_data = image_data
-                st.session_state.image_media_type = get_image_media_type(image_file.name)
+                st.session_state.image_data_list = new_data
+                st.session_state.image_media_types = [get_image_media_type(f.name) for f in image_files]
+                st.session_state.image_names = [f.name for f in image_files]
 
-            # Display the uploaded image
-            st.image(st.session_state.image_data, caption="Uploaded Image", width='stretch')
-            
-            # Display image info
-            st.caption(f"📁 {image_file.name}")
-            st.caption(f"📊 Size: {len(image_data) / 1024:.1f} KB")
-            
-            # Store image name for history metadata
-            st.session_state.image_name = image_file.name
+            # Display uploaded images
+            for i, img_data in enumerate(st.session_state.image_data_list):
+                name = st.session_state.image_names[i]
+                st.image(img_data, caption=name, use_container_width=True)
+                st.caption(f"📁 {name}  •  📊 {len(img_data) / 1024:.1f} KB")
+        else:
+            if st.session_state.image_data_list:
+                st.session_state.image_data_list = []
+                st.session_state.image_media_types = []
+                st.session_state.image_names = []
+                st.session_state.vision_chat_history = []
         
         st.divider()
         
@@ -183,8 +203,8 @@ def main():
             with col1:
                 if st.button("💾 Save Chat", use_container_width=True):
                     metadata = {
-                        "image_name": st.session_state.get("image_name", "unknown"),
-                        "media_type": st.session_state.get("image_media_type", "image/png")
+                        "image_names": st.session_state.image_names,
+                        "media_types": st.session_state.image_media_types
                     }
                     filepath = save_chat_history(
                         st.session_state.vision_chat_history,

@@ -86,6 +86,25 @@ def main():
 
     if st.button(":blue[Create Index]", type="secondary"):
         if len(pdf_docs) != 0:
+            # Preview extracted text from uploaded PDFs
+            with st.expander("PDF Text Preview", expanded=True):
+                for pdf_file in pdf_docs:
+                    st.subheader(f"📄 {pdf_file.name}")
+                    pdf_file.seek(0)
+                    try:
+                        import PyPDF2, io
+                        reader = PyPDF2.PdfReader(io.BytesIO(pdf_file.read()))
+                        st.write(f"**Pages found:** {len(reader.pages)}")
+                        for page_num, page in enumerate(reader.pages, start=1):
+                            text = page.extract_text() or ""
+                            if text.strip():
+                                st.markdown(f"**Page {page_num}** ({len(text)} chars):")
+                                st.text(text[:500] + ("..." if len(text) > 500 else ""))
+                            else:
+                                st.warning(f"Page {page_num}: No extractable text (image-based PDF?)")
+                    except Exception as e:
+                        st.error(f"Error reading {pdf_file.name}: {e}")
+
             # process the information from PDFs
             with st.spinner("Processing"):
                 # Step 1: Create Azure Cognitive Search Index
@@ -96,10 +115,11 @@ def main():
             st.write("Please upload PDF documents")
 
     with st.sidebar:
-        st.header(":blue[Cognitive Search indices]")
+        st.header(":blue[AI Search indices]")
         index_names = st.session_state.search_helper.get_all_indices()
-        for index_name in index_names:
-            st.write(index_name)
+        with st.container(height=300):
+            for index_name in index_names:
+                st.write(index_name)
 
 
 if __name__ == "__main__":

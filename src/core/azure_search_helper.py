@@ -165,13 +165,21 @@ class AzureSearchHelper:
         
         if not isinstance(pdf_path, str):
             print("pdf_path is not a string, assuming file-like object")
-            pdf_reader = PyPDF2.PdfReader(pdf_path)
+            pdf_path.seek(0)
+            raw_bytes = pdf_path.read()
+            print(f"Read {len(raw_bytes)} bytes from file-like object")
+            import io
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(raw_bytes))
         else:
             with open(pdf_path, 'rb') as file:
                 pdf_reader = PyPDF2.PdfReader(file)
-            
+        
+        print(f"PDF has {len(pdf_reader.pages)} pages")
         for page_num, page in enumerate(pdf_reader.pages, start=1):
-            text = page.extract_text()
+            text = page.extract_text() or ""
+            preview = text.strip()[:200].replace('\n', ' ') if text.strip() else "<EMPTY>"
+            print(f"  Page {page_num}: {len(text)} chars, stripped: {len(text.strip())} chars")
+            print(f"    Preview: {preview}")
             if text.strip():  # Only include pages with content
                 pages.append({
                     'page_number': page_num,
