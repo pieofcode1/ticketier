@@ -16,5 +16,6 @@ dependencies = [
     "agent-framework",
     "agent-framework-devui",
     "databricks-sql-connector>=3.6.0",
+    "databricks-ai-search>=0.40",
     "pandas>=2.2.0",
 ]

@@ -1,0 +1,22 @@
+{
+  "manifest": {
+    "column_count": 2,
+    "columns": [
+      {
+        "name": "id"
+      },
+      {
+        "name": "score"
+      }
+    ]
+  },
+  "result": {
+    "row_count": 1,
+    "data_array": [
+      [
+        "ed6ad8ee-8808-4866-b0d2-c8188bcc4d05",
+        0.67659974
+      ]
+    ]
+  }
+}
