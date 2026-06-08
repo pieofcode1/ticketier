@@ -11,8 +11,10 @@ dependencies = [
     "psycopg2-binary>=2.9.11",
     "streamlit>=1.51.0",
     "PyPDF2>=3.0.0",
-    "azure-ai-projects>=2.0.0b2",
+    "azure-ai-projects",
     "python-dotenv>=1.2.1",
-    "agent-framework==1.0.0b251211",
-    "agent-framework-devui>=1.0.0b251211",
+    "agent-framework",
+    "agent-framework-devui",
+    "databricks-sql-connector>=3.6.0",
+    "pandas>=2.2.0",
 ]
