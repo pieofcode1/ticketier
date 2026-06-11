@@ -19,7 +19,7 @@
     "message": "Index is currently online but no updates are found for Delta Live Table: https://adb-2309145367368903.3.azuredatabricks.net/explore/data/manufacturing/bronze/warranty_claims_index. The pipeline may belong to another workspace. ",
     "indexed_row_count": 10002,
     "ready": true,
-    "index_url": "adb-2309145367368903.3.azuredatabricks.net/api/2.0/vector-search/indexes/manufacturing.bronze.warranty_claims_index"
+    "index_url": "dbd61848-cc1d-4440-adf8-3a9b0dd7fa69.3.vector-search.azuredatabricks.net/api/2.0/2309145367368903/vector-search/indexes/manufacturing.bronze.warranty_claims_index"
   },
   "creator": "keyur@mngenvmcap249024.onmicrosoft.com",
   "endpoint_type": "STANDARD",

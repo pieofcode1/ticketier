@@ -19,6 +19,7 @@ Agentic AI Application leveraging Azure AI Foundry for intelligent ticket analys
   - Azure OpenAI Service (with GPT and embedding models deployed)
   - Azure AI Search service
   - PostgreSQL database (optional)
+  - Azure Databricks workspace with Unity Catalog, a SQL Warehouse, and a Vector Search endpoint (optional — only for the Databricks page)
 
 ## Setup
 
@@ -78,7 +79,49 @@ PG_HOST=<your-postgres-host>
 PG_DATABASE=postgres
 PG_USERNAME=<username>
 PG_PASSWORD=<password>
+
+# Databricks (optional — only for the Databricks SQL / Vector Search page)
+DATABRICKS_SERVER_HOSTNAME=<your-workspace>.azuredatabricks.net
+DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/<warehouse-id>
+# Azure Entra ID Service Principal (PAT auth is not supported)
+DATABRICKS_CLIENT_ID=<sp-application-client-id>
+DATABRICKS_CLIENT_SECRET=<sp-client-secret>
+DATABRICKS_TENANT_ID=<azure-tenant-id>
+DATABRICKS_CATALOG=<catalog-name>
+DATABRICKS_SCHEMA=<schema-name>
+DATABRICKS_VS_ENDPOINT=<vector-search-endpoint-name>
 ```
+
+#### Databricks Service Principal Permissions
+
+The Databricks page authenticates **exclusively** via an Azure Entra ID Service Principal (PAT tokens are blocked by security policy). The SP must be granted the following permissions — missing any of these produces a `User not authorized` or `Failed to call Model Serving endpoint` error.
+
+1. **Workspace access** — Account console → Workspaces → your workspace → Permissions → add the SP as a workspace user.
+
+2. **SQL Warehouse** (for NL→SQL queries) — Compute → SQL Warehouses → your warehouse → Permissions → grant **Can Use** to the SP.
+
+3. **Vector Search endpoint** (UI only, not SQL-grantable) — Compute → Vector Search → your endpoint → Permissions → grant **Can Use** to the SP.
+
+4. **Embedding Model Serving endpoint** — Serving → the embedding endpoint backing your index (e.g. `aoai-ncus-text-embedding-ada-002`) → Permissions → grant **Can Query** to the SP.
+
+5. **Unity Catalog grants** (run as a workspace admin in a Databricks SQL editor or notebook):
+
+   ```sql
+   GRANT USE CATALOG ON CATALOG <catalog>                  TO `<sp-application-client-id>`;
+   GRANT USE SCHEMA  ON SCHEMA  <catalog>.<schema>         TO `<sp-application-client-id>`;
+   GRANT SELECT      ON TABLE   <catalog>.<schema>.<index> TO `<sp-application-client-id>`;
+   GRANT SELECT      ON TABLE   <catalog>.<schema>.<source-table> TO `<sp-application-client-id>`;
+   ```
+
+   The principal name is the SP's Azure **application (client) ID** — the same GUID set in `DATABRICKS_CLIENT_ID` — wrapped in backticks.
+
+To verify the SP is wired up correctly, run the probe script:
+
+```powershell
+python -m src.scripts.test_databricks_vector_index <catalog>.<schema>.<index>
+```
+
+It should print `Auth: Azure Entra SP (...)` and dump `describe()`, `scan()`, and `similarity_search()` results to `src/scripts/_vector_probe_out/`.
 
 ### 4. Activate Virtual Environment
 
@@ -217,8 +260,7 @@ ruff check src/
 2. **Authentication Errors**: Verify your API keys and endpoints in `.env`
 3. **Model Not Found**: Check that your model deployment names match those in Azure OpenAI
 4. **Index Errors**: Ensure the search index exists or set `create_index=True`
-
-### Logs
+5. **Databricks `User not authorized` / `PERMISSION_DENIED ... is not authorized to use this SQL Endpoint`**: The Service Principal is missing one of the required grants. Re-check all five permissions in the [Databricks Service Principal Permissions](#databricks-service-principal-permissions) section \u2014 workspace membership, **Can Use** on the SQL Warehouse, **Can Use** on the Vector Search endpoint, **Can Query** on the embedding Model Serving endpoint, and Unity Catalog `USE CATALOG` / `USE SCHEMA` / `SELECT` grants. The GUID in the error message is the SP's client ID.\n6. **Databricks `Failed to call Model Serving endpoint: <name>`**: Grant the SP **Can Query** on that serving endpoint (Serving \u2192 endpoint \u2192 Permissions). This is required for the Vector Search index to compute query embeddings.\n7. **Databricks `Token exchange failed ... HTTP client is closing or has been closed` followed by `Failed to call Model Serving endpoint`**: This is an SDK lifecycle bug that surfaces under Streamlit's threaded reruns when calling `index.similarity_search(query_text=...)`. Even when the SP has **Can Query** on the embedding endpoint, the internal token-exchange path intermittently fails. The Databricks page works around it by embedding the query locally with Azure OpenAI (`EMBEDDING_DEPLOYMENT_NAME`) and passing `query_vector=` to `similarity_search` instead of `query_text=`. If you build new pages that use Vector Search, do the same.\n\n### Logs
 
 Enable verbose logging by setting:
 

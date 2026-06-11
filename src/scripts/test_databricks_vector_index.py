@@ -3,7 +3,9 @@ Probe a Databricks Vector Search index to discover what columns it actually cont
 
 Uses env vars from .env:
   DATABRICKS_SERVER_HOSTNAME
-  DATABRICKS_ACCESS_TOKEN
+  DATABRICKS_CLIENT_ID
+  DATABRICKS_CLIENT_SECRET
+  DATABRICKS_TENANT_ID       (optional; only for Azure Entra SP)
   DATABRICKS_VS_ENDPOINT
   DATABRICKS_VS_INDEX        (optional; if absent, lists all indexes on the endpoint)
 
@@ -53,12 +55,26 @@ def _dump(label: str, obj) -> None:
 
 def get_client() -> VectorSearchClient:
     host = os.getenv("DATABRICKS_SERVER_HOSTNAME")
-    token = os.getenv("DATABRICKS_ACCESS_TOKEN")
-    if not host or not token:
-        raise SystemExit("DATABRICKS_SERVER_HOSTNAME and DATABRICKS_ACCESS_TOKEN must be set in .env")
+    if not host:
+        raise SystemExit("DATABRICKS_SERVER_HOSTNAME must be set in .env")
+
+    client_id = os.getenv("DATABRICKS_CLIENT_ID")
+    client_secret = os.getenv("DATABRICKS_CLIENT_SECRET")
+    tenant_id = os.getenv("DATABRICKS_TENANT_ID")
+
+    if not client_id or not client_secret or not tenant_id:
+        raise SystemExit(
+            "DATABRICKS_CLIENT_ID, DATABRICKS_CLIENT_SECRET, and DATABRICKS_TENANT_ID "
+            "must be set in .env (Azure Entra Service Principal auth is required)."
+        )
+
+    print(f"Auth: Azure Entra SP (client_id={client_id[:8]}..., tenant={tenant_id})")
     return VectorSearchClient(
         workspace_url=f"https://{host}",
-        personal_access_token=token,
+        service_principal_client_id=client_id,
+        service_principal_client_secret=client_secret,
+        azure_tenant_id=tenant_id,
+        disable_notice=True,
     )
 
 

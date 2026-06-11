@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from openai import AzureOpenAI
 from databricks import sql as databricks_sql
 from databricks.ai_search.client import VectorSearchClient
+from databricks.sdk.core import Config
 
 load_dotenv()
 
@@ -44,22 +45,57 @@ def get_openai_client():
     )
 
 
+def _databricks_sp_creds() -> tuple[str, str, str]:
+    """Return (client_id, client_secret, tenant_id) for an Azure Entra Service Principal.
+
+    Raises if any required value is missing.
+    """
+    client_id = os.getenv("DATABRICKS_CLIENT_ID")
+    client_secret = os.getenv("DATABRICKS_CLIENT_SECRET")
+    tenant_id = os.getenv("DATABRICKS_TENANT_ID")
+    if not client_id or not client_secret or not tenant_id:
+        raise RuntimeError(
+            "Azure Entra Service Principal credentials are required. "
+            "Set DATABRICKS_CLIENT_ID, DATABRICKS_CLIENT_SECRET, and "
+            "DATABRICKS_TENANT_ID in .env."
+        )
+    return client_id, client_secret, tenant_id
+
+
 def get_databricks_connection():
-    """Create a Databricks SQL connection."""
+    """Create a Databricks SQL connection using an Azure Entra Service Principal."""
+    server_hostname = os.getenv("DATABRICKS_SERVER_HOSTNAME")
+    http_path = os.getenv("DATABRICKS_HTTP_PATH")
+    client_id, client_secret, tenant_id = _databricks_sp_creds()
+
+    def credential_provider():
+        cfg = Config(
+            host=f"https://{server_hostname}",
+            azure_client_id=client_id,
+            azure_client_secret=client_secret,
+            azure_tenant_id=tenant_id,
+            auth_type="azure-client-secret",
+        )
+        return cfg.authenticate
+
     return databricks_sql.connect(
-        server_hostname=os.getenv("DATABRICKS_SERVER_HOSTNAME"),
-        http_path=os.getenv("DATABRICKS_HTTP_PATH"),
-        access_token=os.getenv("DATABRICKS_ACCESS_TOKEN"),
+        server_hostname=server_hostname,
+        http_path=http_path,
+        credentials_provider=credential_provider,
     )
 
 
 def get_vector_search_client():
-    """Create a Databricks Vector Search client."""
+    """Create a Databricks Vector Search client using an Azure Entra Service Principal."""
     workspace_url = f"https://{os.getenv('DATABRICKS_SERVER_HOSTNAME')}"
-    token = os.getenv("DATABRICKS_ACCESS_TOKEN")
+    client_id, client_secret, tenant_id = _databricks_sp_creds()
+
     return VectorSearchClient(
         workspace_url=workspace_url,
-        personal_access_token=token,
+        service_principal_client_id=client_id,
+        service_principal_client_secret=client_secret,
+        azure_tenant_id=tenant_id,
+        disable_notice=True,
     )
 
 
@@ -252,8 +288,20 @@ def vector_search(index_name: str, endpoint_name: str, query_text: str,
         ]
     if not columns:
         raise ValueError("Could not determine columns for vector search. Please specify columns explicitly.")
+
+    # Embed the query locally with Azure OpenAI and pass query_vector instead of
+    # query_text. This avoids a flaky internal token-exchange path in the
+    # Vector Search SDK that intermittently fails under Streamlit's threaded
+    # rerun model with "Token exchange failed ... HTTP client is closing".
+    embedding_deployment = os.getenv("EMBEDDING_DEPLOYMENT_NAME", "text-embedding-ada-002")
+    embed_resp = get_openai_client().embeddings.create(
+        model=embedding_deployment,
+        input=query_text,
+    )
+    query_vector = embed_resp.data[0].embedding
+
     results = index.similarity_search(
-        query_text=query_text,
+        query_vector=query_vector,
         columns=columns,
         num_results=num_results,
     )
